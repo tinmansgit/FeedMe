@@ -120,7 +120,12 @@ class PodcastApp(tk.Tk):
     def __init__(self, podcasts):
         log_debug("Initializing PodcastApp.")
         super().__init__()
-        self.title("FeedMe Podcasts Seymour! v2.0")
+        self.title("FeedMe Podcasts Seymour!")
+        try:
+            icon = tk.PhotoImage(file="feed-me_icon.png")
+            self.iconphoto(False, icon)
+        except Exception as e:
+            log_error(f"Failed to load icon: {e}")
         self.podcasts = podcasts
         self.current_podcast = None
         self.current_episode_index = None
