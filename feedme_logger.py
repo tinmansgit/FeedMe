@@ -1,7 +1,7 @@
 import logging
 
-error_log_file = 'log_feedme_error.log'
-debug_log_file = 'log_feedme_debug.log'
+error_log_file = '/bin/Python/FeedMe/log_feedme_error.log'
+debug_log_file = '/bin/Python/FeedMe/log_feedme_debug.log'
 
 logger = logging.getLogger('app_logger')
 logger.setLevel(logging.DEBUG)

@@ -1,17 +1,12 @@
-# FeedMe v2.0 20250414.07:40
-import os
-import json
-import subprocess
+# FeedMe v2.1 20250419.07:28
+import os, json, subprocess, feedparser, re, html
 import xml.etree.ElementTree as ET
-import feedparser
-import re
-import html
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog, scrolledtext, font, simpledialog
-import my_logger
-from my_logger import log_error, log_debug
+import feedme_logger
+from feedme_logger import log_error, log_debug
 
-SUBSCRIPTIONS_FILE = "subscriptions.json"
+SUBSCRIPTIONS_FILE = "/bin/Python/FeedMe/subscriptions.json"
 MAX_EPISODES = 100
 
 def load_subscriptions():
@@ -86,14 +81,7 @@ def update_all_feeds(podcast_feeds):
         for entry in data.entries:
             link = entry.get("link", "")
             read_status = old_episodes.get(link, {}).get("read", False)
-            new_episode = {
-                "title": entry.get("title", "No Title"),
-                "published": entry.get("published", "No Publish Date"),
-                "summary": entry.get("summary", "No Summary"),
-                "link": link,
-                "enclosures": entry.get("enclosures", []),
-                "read": read_status
-            }
+            new_episode = {"title": entry.get("title", "No Title"),"published": entry.get("published", "No Publish Date"),"summary": entry.get("summary", "No Summary"),"link": link,"enclosures": entry.get("enclosures", []),"read": read_status}
             new_episodes.append(new_episode)
             log_debug(f"Processed episode: {new_episode['title']}, read: {read_status}")
 
@@ -121,8 +109,9 @@ class PodcastApp(tk.Tk):
         log_debug("Initializing PodcastApp.")
         super().__init__()
         self.title("FeedMe Podcasts Seymour!")
+        self.configure(bg="black")
         try:
-            icon = tk.PhotoImage(file="feed-me_icon.png")
+            icon = tk.PhotoImage(file="/bin/Python/FeedMe/feed-me_icon.png")
             self.iconphoto(False, icon)
         except Exception as e:
             log_error(f"Failed to load icon: {e}")
@@ -139,8 +128,12 @@ class PodcastApp(tk.Tk):
 
         style = ttk.Style(self)
         style.theme_use("default")
+        style.configure("TFrame", background="black")
+        style.configure("TLabel", background="black", foreground="white", font=("TkDefaultFont", 11))
+        style.configure("TButton", background="black", foreground="white", font=("TkDefaultFont", 11))
         style.configure("Treeview", background="black", foreground="white", fieldbackground="black", font=("TkDefaultFont", 11))
         style.map("Treeview", background=[("selected", "#347083")])
+        style.configure("TEntry", fieldbackground="black", foreground="white")
 
         self.create_widgets()
 
@@ -167,7 +160,7 @@ class PodcastApp(tk.Tk):
         podcast_label = ttk.Label(self.left_frame, text="Podcasts:", font=self.bold_font)
         podcast_label.pack(pady=(10, 0))
 
-        self.podcast_listbox = tk.Listbox(self.left_frame, bg="black", fg="white", font=("TkDefaultFont", 11))
+        self.podcast_listbox = tk.Listbox(self.left_frame, bg="black", fg="white", font=("TkDefaultFont", 11), selectbackground="#347083")
         self.podcast_listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         self.podcast_listbox.bind("<<ListboxSelect>>", self.on_podcast_select)
         self.podcast_listbox.bind("<Button-3>", self.show_context_menu)  # Right-click
@@ -179,7 +172,7 @@ class PodcastApp(tk.Tk):
         ttk.Button(frame_buttons, text="Add Feed", command=self.add_new_feed).grid(row=0, column=2, padx=5)
         log_debug("Left frame set up complete.")
 
-        self.context_menu = tk.Menu(self, tearoff=0)
+        self.context_menu = tk.Menu(self, tearoff=0, bg="black", fg="white")
         self.context_menu.add_command(label="Delete Feed", command=self.delete_feed)
 
     def show_context_menu(self, event):
@@ -207,7 +200,7 @@ class PodcastApp(tk.Tk):
             return
         display_name = self.podcast_listbox.get(selection[0])
         podcast_name = display_name.rstrip(" *")
-        answer = messagebox.askyesno("Delete Feed", f"Are you sure you wish to delete the feed '{podcast_name}' and all its episodes?")
+        answer = messagebox.askyesno("Delete Feed", f"Are you sure you wish to delete the feed '{podcast_name}' and all its episodes?",parent=self)
         if answer:
             if podcast_name in self.podcasts:
                 log_debug(f"Deleting feed: {podcast_name}.")
@@ -249,7 +242,7 @@ class PodcastApp(tk.Tk):
         details_label = ttk.Label(self.details_frame, text="Episode Details:", font=self.bold_font)
         details_label.pack(pady=(0, 5))
 
-        self.details_text = scrolledtext.ScrolledText(self.details_frame, wrap=tk.WORD, bg="black", fg="white", font=("TkDefaultFont", 11))
+        self.details_text = scrolledtext.ScrolledText(self.details_frame, wrap=tk.WORD, bg="black", fg="white", insertbackground="white", font=("TkDefaultFont", 11))
         self.details_text.pack(fill=tk.BOTH, expand=True)
 
         frame_control = ttk.Frame(self.details_frame)
@@ -270,7 +263,7 @@ class PodcastApp(tk.Tk):
     def download_episode(self):
         if self.current_podcast is None or self.current_episode_index is None:
             log_error("Download episode called with no selection.")
-            messagebox.showwarning("No Selection", "Select an episode to download.")
+            messagebox.showwarning("No Selection", "Select an episode to download.", parent=self)
             return
         
         podcast_name = self.current_podcast
@@ -278,7 +271,7 @@ class PodcastApp(tk.Tk):
         
         if not episodes or self.current_episode_index >= len(episodes):
             log_error(f"Invalid episode index for {podcast_name}.")
-            messagebox.showerror("Error", "No valid episode selected.")
+            messagebox.showerror("Error", "No valid episode selected.", parent=self)
             return
         
         currentEpisode = episodes[self.current_episode_index]
@@ -286,17 +279,17 @@ class PodcastApp(tk.Tk):
         
         if not enclosures:
             log_error(f"No media found in this episode of {podcast_name}.")
-            messagebox.showinfo("Info", "This episode has no downloadable content.")
+            messagebox.showinfo("Info", "This episode has no downloadable content.", parent=self)
             return
         
         media_url = enclosures[0].get('href', None)
         
         if not media_url:
             log_error(f"No media URL found in this episode of {podcast_name}.")
-            messagebox.showerror("Error", "No valid media URL found.")
+            messagebox.showerror("Error", "No valid media URL found.", parent=self)
             return
         
-        dir_path = filedialog.askdirectory(title="Select Download Location")
+        dir_path = filedialog.askdirectory(title="Select Download Location", parent=self)
         if not dir_path:
             log_debug("User canceled download location selection.")
             return
@@ -305,10 +298,10 @@ class PodcastApp(tk.Tk):
             command = f'wget --output-document="{os.path.join(dir_path, os.path.basename(media_url))}" "{media_url}"'
             subprocess.Popen(command, shell=True)
             
-            messagebox.showinfo("Download Started", f"Downloading {os.path.basename(media_url)} to {dir_path}.")
+            messagebox.showinfo("Download Started", f"Downloading {os.path.basename(media_url)} to {dir_path}.", parent=self)
         except Exception as e:
             log_error(f"Error downloading file: {e}")
-            messagebox.showerror("Download Error", f"Failed to start download. Reason: {str(e)}")
+            messagebox.showerror("Download Error", f"Failed to start download. Reason: {str(e)}", parent=self)
 
     def on_podcast_select(self, event):
         selection = self.podcast_listbox.curselection()
@@ -369,7 +362,7 @@ class PodcastApp(tk.Tk):
     def manual_mark_read(self):
         if self.current_podcast is None or self.current_episode_index is None:
             log_error("Manual mark read called with no episode selected.")
-            messagebox.showwarning("No Selection", "Select a damn episode.")
+            messagebox.showwarning("No Selection", "Select a damn episode.", parent=self)
             return
         log_debug(f"Manually marking episode at index {self.current_episode_index} as read.")
         self.podcasts[self.current_podcast]["episodes"][self.current_episode_index]["read"] = True
@@ -380,7 +373,7 @@ class PodcastApp(tk.Tk):
     def manual_mark_unread(self):
         if self.current_podcast is None or self.current_episode_index is None:
             log_error("Manual mark unread called with no episode selected.")
-            messagebox.showwarning("No Selection", "Choose a damn podcast shithead.")
+            messagebox.showwarning("No Selection", "Choose a damn podcast shithead.", parent=self)
             return
         log_debug(f"Manually marking episode at index {self.current_episode_index} as unread.")
         self.podcasts[self.current_podcast]["episodes"][self.current_episode_index]["read"] = False
@@ -400,15 +393,7 @@ class PodcastApp(tk.Tk):
             return
         episode = self.podcasts[self.current_podcast]["episodes"][self.current_episode_index]
         clean_summary = clean_html(episode.get("summary", "No Summary Available"))
-        details = [
-            f"Title: {episode.get('title', 'No Title')}",
-            f"Published: {episode.get('published', 'No Publish Date')}",
-            f"Link: {episode.get('link', 'No Link')}",
-            "",
-            "Summary:",
-            clean_summary,
-            ""
-        ]
+        details = [f"Title: {episode.get('title', 'No Title')}",f"Published: {episode.get('published', 'No Publish Date')}",f"Link: {episode.get('link', 'No Link')}","","Summary:",clean_summary,""]
         enclosures = episode.get("enclosures", [])
         if enclosures:
             details.append("Media attachments:")
@@ -431,25 +416,25 @@ class PodcastApp(tk.Tk):
     def play_episode(self):
         if self.current_podcast is None or self.current_episode_index is None:
             log_error("Play episode invoked with no episode selected.")
-            messagebox.showwarning("No Selection", "Select a damn episode Idjit.")
+            messagebox.showwarning("No Selection", "Select a damn episode Idjit.", parent=self)
             return
         episode = self.podcasts[self.current_podcast]["episodes"][self.current_episode_index]
         enclosures = episode.get("enclosures", [])
         if not enclosures:
             log_error("Attempted to play an episode with no media enclosures.")
-            messagebox.showinfo("No media", "This episode has 0 media attachments, that's bullshit'.")
+            messagebox.showinfo("No media", "This episode has 0 media attachments, that's bullshit'.", parent=self)
             return
         media_url = enclosures[0].get("href")
         if not media_url:
             log_error("Media URL missing in enclosure.")
-            messagebox.showerror("Playback Error", "No valid media URL found.")
+            messagebox.showerror("Playback Error", "No valid media URL found.", parent=self)
             return
         try:
             log_debug(f"Launching media player for URL: {media_url}.")
             subprocess.Popen(["mpv", "--force-window=yes", media_url])
         except Exception as e:
             log_error(f"Error launching mpv: {e}")
-            messagebox.showerror("Playback Error", f"Error launching mpv: {e}")
+            messagebox.showerror("Playback Error", f"Error launching mpv: {e}", parent=self)
 
     def update_feeds(self):
         log_debug("Update feeds button clicked.")
@@ -459,11 +444,11 @@ class PodcastApp(tk.Tk):
             self.populate_episode_list(self.current_podcast)
         self.populate_podcast_list()
         log_debug("Feeds updated successfully.")
-        messagebox.showinfo("Feeds Updated", "Feeds Updated")
+        messagebox.showinfo("Feeds Updated", "Feeds Updated", parent=self)
 
     def import_opml_file(self):
         log_debug("Import OPML file button clicked.")
-        filename = filedialog.askopenfilename(title="Select OPML", filetypes=[("OPML files", "*.opml"), ("XML files", "*.xml"), ("All files", "*.*")])
+        filename = filedialog.askopenfilename(title="Select OPML", filetypes=[("OPML files", "*.opml"), ("XML files", "*.xml"), ("All files", "*.*")], parent=self)
         if not filename:
             log_debug("No file selected for OPML import.")
             return
@@ -476,30 +461,30 @@ class PodcastApp(tk.Tk):
             save_subscriptions(self.podcasts)
             self.populate_podcast_list()
             log_debug(f"Imported {len(opml_feeds)} feeds from OPML.")
-            messagebox.showinfo("Import Complete", f"Imported {len(opml_feeds)} feeds.")
+            messagebox.showinfo("Import Complete", f"Imported {len(opml_feeds)} feeds.", parent=self)
         else:
             log_error("No feeds imported from OPML.")
-            messagebox.showwarning("Import Failed")
+            messagebox.showwarning("Import Failed", parent=self)
 
     def add_new_feed(self):
         log_debug("Add new feed button clicked.")
-        title = simpledialog.askstring("Add New Feed", "Enter podcast title:")
+        title = simpledialog.askstring("Add New Feed", "Enter podcast title:", parent=self)
         if not title:
             log_debug("No title provided for new feed.")
             return
-        url = simpledialog.askstring("Add New Feed", "Enter feed URL:")
+        url = simpledialog.askstring("Add New Feed", "Enter feed URL:", parent=self)
         if not url:
             log_debug("No URL provided for new feed.")
             return
         if title in self.podcasts:
             log_error(f"Duplicate feed: {title}.")
-            messagebox.showwarning("Duplicate Feed")
+            messagebox.showwarning("Duplicate Feed", parent=self)
             return
         self.podcasts[title] = {"url": url, "episodes": []}
         save_subscriptions(self.podcasts)
         self.populate_podcast_list()
         log_debug(f"New feed '{title}' added.")
-        messagebox.showinfo("Feed Added", f"'{title}'. Yippee!")
+        messagebox.showinfo("Feed Added", f"'{title}'. Yippee!", parent=self)
 
 def main():
     log_debug("Starting main function.")
@@ -511,4 +496,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
