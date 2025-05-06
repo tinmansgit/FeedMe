@@ -1,7 +1,9 @@
 import logging
+from datetime import datetime
 
-error_log_file = '/bin/Python/FeedMe/log_feedme_error.log'
-debug_log_file = '/bin/Python/FeedMe/log_feedme_debug.log'
+current_date = datetime.now().strftime('%Y-%m-%d')
+error_log_file = f'~/bin/Python/FeedMe/log_error_feedme_{current_date}.log'
+debug_log_file = f'~/bin/Python/FeedMe/log_debug_feedme_{current_date}.log'
 
 logger = logging.getLogger('app_logger')
 logger.setLevel(logging.DEBUG)
