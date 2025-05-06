@@ -6,7 +6,7 @@ from tkinter import ttk, messagebox, filedialog, scrolledtext, font, simpledialo
 import feedme_logger
 from feedme_logger import log_error, log_debug
 
-SUBSCRIPTIONS_FILE = "/bin/Python/FeedMe/subscriptions.json"
+SUBSCRIPTIONS_FILE = "~/bin/Python/FeedMe/subscriptions.json"
 MAX_EPISODES = 100
 
 def load_subscriptions():
@@ -111,7 +111,7 @@ class PodcastApp(tk.Tk):
         self.title("FeedMe Podcasts Seymour!")
         self.configure(bg="black")
         try:
-            icon = tk.PhotoImage(file="/bin/Python/FeedMe/feed-me_icon.png")
+            icon = tk.PhotoImage(file="~/bin/Python/FeedMe/feed-me_icon.png")
             self.iconphoto(False, icon)
         except Exception as e:
             log_error(f"Failed to load icon: {e}")
